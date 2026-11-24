@@ -1,0 +1,64 @@
+# MoneyLov: app + PostgreSQL + sao lưu hằng ngày (+ Caddy HTTPS khi bật profile "caddy").
+# Chạy: cp .env.example .env, sửa .env, rồi: docker compose --profile caddy up -d --build
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: moneylov
+      POSTGRES_USER: moneylov
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Đặt POSTGRES_PASSWORD trong .env}
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moneylov -d moneylov"]
+      interval: 10s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://moneylov:${POSTGRES_PASSWORD}@db:5432/moneylov
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    ports:
+      # Chỉ mở trên máy chủ; Caddy (hoặc nginx có sẵn) đứng trước
+      - "127.0.0.1:${APP_PORT:-8787}:8787"
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
+    volumes:
+      - ./backups:/backups
+      - ./deploy/backup.sh:/backup.sh:ro
+    entrypoint: ["/bin/sh", "/backup.sh"]
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["caddy"]
+    restart: unless-stopped
+    depends_on: [app]
+    environment:
+      # Đặt DOMAIN trong .env (ví dụ chi.zett.io.vn) trước khi bật profile caddy
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  db:
+  caddy_data:
+  caddy_config:
