@@ -1,0 +1,14 @@
+{
+  "name": "moneylov",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev:api": "pnpm --filter @moneylov/api dev",
+    "dev:web": "pnpm --filter @moneylov/web dev",
+    "build": "pnpm --filter @moneylov/web build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "db:generate": "pnpm --filter @moneylov/api db:generate"
+  }
+}
